@@ -2,26 +2,44 @@ version: '3.9'
 
 services:
   backend:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile
-    
     env_file:
-      - .env
-    
-    # or 
-    # environment:
-      #- BACKEND_PORT=7001   # if you change the port, make sure to also change the VITE_WS_BACKEND_URL at frontend/.env.local
-      # - OPENAI_API_KEY=your_openai_api_key
-    
+      - .env                    # carrega todas as chaves
     ports:
-      - "${BACKEND_PORT:-7001}:${BACKEND_PORT:-7001}"
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
+    command: >
+      poetry run uvicorn main:app
+      --host 0.0.0.0
+      --port ${BACKEND_PORT}
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.s2c-back.rule=Host(`${BACKEND_DOMAIN}`)"
+      - traefik.http.routers.s2c-back.entrypoints=websecure
+      - traefik.http.routers.s2c-back.tls.certresolver=letsencrypt
+      - "traefik.http.services.s2c-back.loadbalancer.server.port=${BACKEND_PORT}"
 
-    command: poetry run uvicorn main:app --host 0.0.0.0 --port ${BACKEND_PORT:-7001}
-  
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:                      # variáveis usadas no build Vite
+        VITE_HTTP_BACKEND_URL: ${VITE_HTTP_BACKEND_URL}
+        VITE_WS_BACKEND_URL: ${VITE_WS_BACKEND_URL}
+    env_file:
+      - .env
     ports:
       - "5173:5173"
+    depends_on:
+      - backend
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.s2c-front.rule=Host(`${FRONTEND_DOMAIN}`)"
+      - traefik.http.routers.s2c-front.entrypoints=websecure
+      - traefik.http.routers.s2c-front.tls.certresolver=letsencrypt
+      - "traefik.http.services.s2c-front.loadbalancer.server.port=5173"
+
+networks:
+  default:
+    name: portainer_default      # rede que o Traefik do Coolify já usa

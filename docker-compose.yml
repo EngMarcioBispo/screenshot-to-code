@@ -4,7 +4,9 @@ version: '3.9'
 # O Docker não vai criar esta rede, mas vai se conectar a ela.
 networks:
   proxy_network:
-    name: portainer_default # <- NOME REAL DA REDE DO COOLIFY/TRAEFIK
+    # 2. CORREÇÃO: Alterado para 'coolify-proxy', o nome padrão mais comum.
+    # Se o deploy falhar novamente, encontre o nome correto com 'docker network ls' e substitua aqui.
+    name: coolify-proxy
     external: true
 
 services:
@@ -14,7 +16,6 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
-    # A exposição de portas foi removida, o que está correto. O acesso é via Traefik.
     command: >
       poetry run uvicorn main:app
       --host 0.0.0.0
@@ -27,15 +28,14 @@ services:
       - "traefik.http.routers.s2c-back.entrypoints=websecure"
       - "traefik.http.routers.s2c-back.tls.certresolver=letsencrypt"
       - "traefik.http.services.s2c-back.loadbalancer.server.port=${BACKEND_PORT}"
-      # 3. Especificamos a rede para o Traefik usar, garantindo que ele olhe na rede certa.
-      - "traefik.docker.network=portainer_default"
+      # 3. CORREÇÃO: Atualizado para corresponder ao nome da rede.
+      - "traefik.docker.network=coolify-proxy"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # As URLs públicas são mantidas, pois são obrigatórias.
         VITE_HTTP_BACKEND_URL: ${VITE_HTTP_BACKEND_URL}
         VITE_WS_BACKEND_URL: ${VITE_WS_BACKEND_URL}
     env_file:
@@ -50,6 +50,6 @@ services:
       - "traefik.http.routers.s2c-front.entrypoints=websecure"
       - "traefik.http.routers.s2c-front.tls.certresolver=letsencrypt"
       - "traefik.http.services.s2c-front.loadbalancer.server.port=5173"
-      # 3. Especificamos a rede para o Traefik usar
-      - "traefik.docker.network=portainer_default"
+      # 3. CORREÇÃO: Atualizado para corresponder ao nome da rede.
+      - "traefik.docker.network=coolify-proxy"
 
